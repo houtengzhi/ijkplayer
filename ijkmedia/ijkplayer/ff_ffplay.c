@@ -2722,6 +2722,7 @@ static void sdl_audio_callback(void *opaque, Uint8 *stream, int len)
 
 static int audio_open(FFPlayer *opaque, int64_t wanted_channel_layout, int wanted_nb_channels, int wanted_sample_rate, struct AudioParams *audio_hw_params)
 {
+    av_log(NULL, AV_LOG_DEBUG, "audio_open");
     FFPlayer *ffp = opaque;
     VideoState *is = ffp->is;
     SDL_AudioSpec wanted_spec, spec;
@@ -2806,6 +2807,7 @@ static int audio_open(FFPlayer *opaque, int64_t wanted_channel_layout, int wante
 /* open a given stream. Return 0 if OK */
 static int stream_component_open(FFPlayer *ffp, int stream_index)
 {
+    ALOGD("stream_component_open, stream_index=%d", stream_index);
     VideoState *is = ffp->is;
     AVFormatContext *ic = is->ic;
     AVCodecContext *avctx;
@@ -3116,6 +3118,8 @@ static int read_thread(void *arg)
 
     if (ffp->iformat_name)
         is->iformat = av_find_input_format(ffp->iformat_name);
+
+	av_log(NULL, AV_LOG_DEBUG, "avformat_open_input");
     err = avformat_open_input(&ic, is->filename, is->iformat, &ffp->format_opts);
     if (err < 0) {
         print_error(is->filename, err);
@@ -3163,6 +3167,7 @@ static int read_thread(void *arg)
                     break;
                 }
             }
+			av_log(NULL, AV_LOG_DEBUG, "avformat_find_stream_info");
             err = avformat_find_stream_info(ic, opts);
         } while(0);
         ffp_notify_msg1(ffp, FFP_MSG_FIND_STREAM_INFO);
@@ -3210,6 +3215,7 @@ static int read_thread(void *arg)
 
     is->realtime = is_realtime(ic);
 
+	av_log(NULL, AV_LOG_DEBUG, "avformat_find_stream_info");
     av_dump_format(ic, 0, is->filename, 0);
 
     int video_stream_count = 0;
@@ -3809,7 +3815,7 @@ inline static int log_level_av_to_ijk(int av_level)
     else if (av_level <= AV_LOG_WARNING)    ijk_level = IJK_LOG_WARN;
     else if (av_level <= AV_LOG_INFO)       ijk_level = IJK_LOG_INFO;
     // AV_LOG_VERBOSE means detailed info
-    else if (av_level <= AV_LOG_VERBOSE)    ijk_level = IJK_LOG_INFO;
+    else if (av_level <= AV_LOG_VERBOSE)    ijk_level = IJK_LOG_VERBOSE;
     else if (av_level <= AV_LOG_DEBUG)      ijk_level = IJK_LOG_DEBUG;
     else if (av_level <= AV_LOG_TRACE)      ijk_level = IJK_LOG_VERBOSE;
     else                                    ijk_level = IJK_LOG_VERBOSE;
@@ -3839,15 +3845,15 @@ static void ffp_log_callback_brief(void *ptr, int level, const char *fmt, va_lis
         return;
 
     int ffplv __unused = log_level_av_to_ijk(level);
-    VLOG(ffplv, IJK_LOG_TAG, fmt, vl);
+    VLOG(ffplv, "IJKFFMPEG_brief", fmt, vl);
 }
 
 static void ffp_log_callback_report(void *ptr, int level, const char *fmt, va_list vl)
 {
-    if (level > av_log_get_level())
-        return;
+    //if (level > av_log_get_level())
+        //return;
 
-    int ffplv __unused = log_level_av_to_ijk(level);
+    int ffplv = log_level_av_to_ijk(level);
 
     va_list vl2;
     char line[1024];
@@ -3858,7 +3864,7 @@ static void ffp_log_callback_report(void *ptr, int level, const char *fmt, va_li
     av_log_format_line(ptr, level, fmt, vl2, line, sizeof(line), &print_prefix);
     va_end(vl2);
 
-    ALOG(ffplv, IJK_LOG_TAG, "%s", line);
+    ALOG(ffplv, "IJKFFMPEG_report", "%s", line);
 }
 
 int ijkav_register_all(void);
@@ -3883,7 +3889,14 @@ void ffp_global_init()
     avformat_network_init();
 
     av_lockmgr_register(lockmgr);
-    av_log_set_callback(ffp_log_callback_brief);
+
+	ALOGD("av_log_set_callback");
+    av_log_set_callback(ffp_log_callback_report);
+	int log_level = av_log_get_level();
+	ALOGD("current log level: %d", log_level);
+	av_log_set_level(AV_LOG_TRACE);
+	log_level = av_log_get_level();
+	ALOGD("current log level: %d", log_level);
 
     av_init_packet(&flush_pkt);
     flush_pkt.data = (uint8_t *)&flush_pkt;

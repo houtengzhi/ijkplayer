@@ -1105,6 +1105,11 @@ IjkMediaPlayer_native_setLogLevel(JNIEnv *env, jclass clazz, jint level)
 {
     MPTRACE("%s(%d)\n", __func__, level);
     ijkmp_global_set_log_level(level);
+
+	//modify by yechy
+	//ALOGD("Set log report");
+	//ijkmp_global_set_log_report(1);
+	
     ALOGD("moncleanup\n");
 }
 
